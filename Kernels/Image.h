@@ -13,7 +13,7 @@
 
 #include <vector>
 
-#include "bitmap.h"
+#include "../ImageUtils/bitmap.h"
 class Image {
 public:
     Image();

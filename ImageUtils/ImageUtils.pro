@@ -29,8 +29,14 @@ unix {
 !isEmpty(target.path): INSTALLS += target
 
 
-headersDataFiles.path = $$[QT_INSTALL_HEADERS]/ImageUtils/
-headersDataFiles.files = $$PWD/*.h
-INSTALLS += headersDataFiles
+#headersDataFiles.path = $$[QT_INSTALL_HEADERS]/ImageUtils/
+#headersDataFiles.files = $$PWD/*.h
+#INSTALLS += headersDataFiles
 
 
+CONFIG(debug, debug|release){
+    DESTDIR = ../lib/debug
+}
+else{
+    DESTDIR = ../lib/release
+}

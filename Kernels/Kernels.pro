@@ -28,9 +28,9 @@ unix {
 #-----------------------------------------------------
 # Library CONFIGURATION
 #-----------------------------------------------------
-win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../../../ImageUtils/release/ -lImageUtils
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../../../ImageUtils/debug/ -lImageUtils
-else:unix: LIBS += -L$$OUT_PWD/../ImageUtils/ -lImageUtils
+win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../ImageUtils/release/ -lImageUtils
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../debug/ -lImageUtils
+else:unix: LIBS += -L$$OUT_PWD/../lib/debug -lImageUtils
 
 INCLUDEPATH += \
         $$PWD/../ImageUtils
@@ -39,7 +39,7 @@ DEPENDPATH += \
 
 win32:CONFIG(release, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/release/ImageUtils.lib
 else:win32:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/debug/ImageUtils.lib
-else:unix: PRE_TARGETDEPS += $$OUT_PWD/../ImageUtils/libImageUtils.a
+else:unix: PRE_TARGETDEPS += $$OUT_PWD/../lib/debug/libImageUtils.a
 
 #-----------------------------------------------------
 # CUDA CONFIGURATION
@@ -118,3 +118,10 @@ INCLUDEPATH += $$CUDA_DIR/targets/x86_64-linux/include
 DISTFILES += \
     Image.cu
 
+
+CONFIG(debug, debug|release){
+    DESTDIR = ../lib/debug
+}
+else{
+    DESTDIR = ../lib/release
+}

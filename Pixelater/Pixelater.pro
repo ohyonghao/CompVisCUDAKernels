@@ -43,6 +43,11 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 #-----------------------------------------------------
 # Library CONFIGURATION
 #-----------------------------------------------------
+#win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../ImageUtils/release/ -lImageUtils
+#else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../debug/ -lImageUtils
+#else:unix:
+LIBS += -L$$OUT_PWD/../lib/debug -lImageUtils \
+        -lKernels
 
 INCLUDEPATH += \
         $$PWD/../ImageUtils \
@@ -52,6 +57,12 @@ DEPENDPATH += \
         $$PWD/../Kernels
 
 
+#win32:CONFIG(release, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/release/ImageUtils.lib
+#else:win32:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/debug/ImageUtils.lib
+#else:unix:
+PRE_TARGETDEPS += $$OUT_PWD/../lib/debug/libImageUtils.a \
+                  $$OUT_PWD/../lib/debug/libKernels.a
+
 #-----------------------------------------------------
 # CUDA CONFIGURATION
 #-----------------------------------------------------
@@ -60,8 +71,8 @@ CUDA_OBJECTS_DIR = OBJECTS_DIR/../cuda
 
 #QMAKE_CXXFLAGS += -xcuda
 ## CUDA_SOURCES - the source (generally .cu) files for nvcc. No spaces in path names
-CUDA_SOURCES += \
-Image.cu
+CUDA_SOURCES +=
+#Image.cu
 
 # CUDA settings
 SYSTEM_NAME = x86_64                   # Depending on your system either 'Win32', 'x64', or 'Win64'
