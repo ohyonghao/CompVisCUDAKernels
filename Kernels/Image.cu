@@ -19,10 +19,13 @@ using namespace std;
 __host__
 void Image::importImage(const Bitmap &bitmap){
     // TODO: Calculate importing padding known as pitch=(width + padding)
+    p_bpp = bitmap.bpp();
     p_width = bitmap.width();
     p_height = bitmap.height();
-    p_size = p_width * p_height * 4;
+    p_size = p_width * p_height * p_bpp;
 
+    cout << "bpp: " << p_bpp << endl;
+    cout << "p_size: " << p_size << endl;
     reloadImage(bitmap);
 }
 
@@ -33,7 +36,7 @@ void Image::reloadImage(const Bitmap &bitmap){
         p_height != bitmap.height() || p_size != d_image.size() ){
         p_width = bitmap.width();
         p_height = bitmap.height();
-        p_size = p_width * p_height * 4;
+        p_size = p_width * p_height * p_bpp;
         d_image.resize(p_size);
         d_result.resize(p_size);
     }
@@ -44,7 +47,7 @@ void Image::reloadImage(const Bitmap &bitmap){
         return in/255.0;
     });
 
-    d_image = h_image;
+    thrust::copy(h_image.begin(), h_image.end(), d_image.begin() );
 }
 // Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
 inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
@@ -54,8 +57,8 @@ constexpr int MASK_WIDTH = 5;
 
 constexpr unsigned int BLOCKW = 32;
 constexpr unsigned int BLOCKH = 32;
-constexpr unsigned int TILEW = 4 * 4; // pixels * channels RGBA
-constexpr unsigned int CHANNEL = 4;
+constexpr unsigned int TILEW = 4 * 3; // pixels * channels RGB
+constexpr unsigned int CHANNEL = 3;
 constexpr unsigned int PIXEL_W = TILEW / CHANNEL;
 //constexpr unsigned int PIXEL_H = TILEW;
 __constant__ int cd_Mask[MASK_WIDTH][MASK_WIDTH];
@@ -107,6 +110,8 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
 }
 __host__
 void Image::CUDABlur(Bitmap &bitmap){
+    cout << "Calling CUDABlur" << endl;
+    cout.flush();
     if( p_size == 0 ){
         importImage(bitmap);
     }else{
@@ -128,10 +133,18 @@ void Image::CUDABlur(Bitmap &bitmap){
 
 __host__
 void Image::exportImage(Bitmap &bitmap){
-    thrust::host_vector<float> h_image(p_size);
-    h_image = d_result;
+    cout << "Begin Exporting Image" << endl;
+    thrust::host_vector<float> h_image(d_result.begin(), d_result.end());
+    cudaDeviceSynchronize();
 
-    std::transform(begin(h_image), end(h_image), begin(bitmap.getBits()), [](auto in){
+//    auto output = bitmap.getBits().begin();
+//    uint32_t count = 0;
+//    for( auto in = h_image.begin(); in != h_image.end(); ++in ){
+//        *output = (*in) * 255.0;
+//        ++count;
+//    }cout << "count: " << count << endl;
+
+    std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), [](auto in){
         return in * 255.0;
     });
 }

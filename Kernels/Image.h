@@ -28,6 +28,7 @@ private:
     thrust::device_vector<float> d_image;
     thrust::device_vector<float> d_result;
 
+    size_t p_bpp{0};
     size_t p_size{0};
     size_t p_width{0};
     size_t p_height{0};

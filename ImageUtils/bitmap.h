@@ -172,7 +172,7 @@ public:
 
     auto& getBits(){return _bits;}
     const auto& getBits()const{return _bits;}
-    auto bpp(){ return _bpp;}
+    auto bpp()const{ return _bpp;}
     // This function sets the internal dimensions of the bitmap, and in doing so
     // it takes no regards for the image that was in it and should be considered
     // corrucpted.
