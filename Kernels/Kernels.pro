@@ -1,56 +1,45 @@
-#-------------------------------------------------
-#
-# Project created by QtCreator 2019-03-10T17:08:48
-#
-#-------------------------------------------------
+CONFIG -= qt
 
-QT       += core gui
+TEMPLATE = lib
+DEFINES += KERNELS_LIBRARY
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+CONFIG += c++17 staticlib
 
-TARGET = Pixelater
-
-# The following define makes your compiler emit warnings if you use
-# any feature of Qt which has been marked as deprecated (the exact warnings
-# depend on your compiler). Please consult the documentation of the
-# deprecated API in order to know how to port your code away from it.
-DEFINES += QT_DEPRECATED_WARNINGS
-
-QMAKE_CXXFLAGS += -O3
-# You can also make your code fail to compile if you use deprecated APIs.
+# You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
-# You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
-CONFIG += c++17 O2
-
 SOURCES += \
-        main.cpp \
-        MainWindow.cpp \
-        ImageDisplay.cpp \
-        ImageProcessor.cpp
-
+    Image.cpp \
+    kernels.cpp
 
 HEADERS += \
-        MainWindow.h \
-        ImageDisplay.h\
-        ImageProcessor.h
+    Image.h \
+    Kernels_global.h \
+    kernels.h
+
 # Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
+unix {
+    target.path = /usr/lib
+}
 !isEmpty(target.path): INSTALLS += target
+
 
 #-----------------------------------------------------
 # Library CONFIGURATION
 #-----------------------------------------------------
+win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../../../ImageUtils/release/ -lImageUtils
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../../../ImageUtils/debug/ -lImageUtils
+else:unix: LIBS += -L$$OUT_PWD/../ImageUtils/ -lImageUtils
 
 INCLUDEPATH += \
-        $$PWD/../ImageUtils \
-        $$PWD/../Kernels
+        $$PWD/../ImageUtils
 DEPENDPATH += \
-        $$PWD/../ImageUtils \
-        $$PWD/../Kernels
+        $$PWD/../ImageUtils
 
+win32:CONFIG(release, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/release/ImageUtils.lib
+else:win32:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$OUT_PWD/../../../ImageUtils/debug/ImageUtils.lib
+else:unix: PRE_TARGETDEPS += $$OUT_PWD/../ImageUtils/libImageUtils.a
 
 #-----------------------------------------------------
 # CUDA CONFIGURATION
@@ -125,4 +114,7 @@ else {
 LIBS += -L$$CUDA_LIBS_DIR $$CUDA_LIBS
 
 INCLUDEPATH += $$CUDA_DIR/targets/x86_64-linux/include
+
+DISTFILES += \
+    Image.cu
 
