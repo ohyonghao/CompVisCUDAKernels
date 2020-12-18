@@ -836,8 +836,8 @@ inline pt interpolation( pt p, pt q, point_t sp, point_t sq, point_t sigma){
 void draw(Bitmap&o, uint32_t x, uint32_t y, uint32_t color, uint32_t thickness ){
     // Need a good way to pull out the color, or split this, but for now we'll
     // Leave this like this
-    for( uint32_t i = 0; i < thickness && x+i < o.width(); ++i){
-        for( uint32_t j = 0; j < thickness && y+j < o.height(); ++j ){
+    for( uint32_t i = 0; i < thickness && x+i < static_cast<uint32_t>(o.width()); ++i){
+        for( uint32_t j = 0; j < thickness && y+j < static_cast<uint32_t>(o.height()); ++j ){
             o.r(x+i,y+j) = (color & 0xFF0000) >> 16;
             o.g(x+i,y+j) = (color & 0x00FF00) >> 8;
             o.b(x+i,y+j) = (color & 0x0000FF);

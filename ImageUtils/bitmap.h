@@ -39,7 +39,6 @@ private:
     // 06  5   4B   Garbage
     // 0A  10  4B   Offset to the start of data
     // Warning: Read in little endian if using Vim:%!xxd
-#pragma pack(push, 2) // fixes problem with char array becoming 4 bytes for alignment purposes
     struct HEADER{
         // This solution, which is now commented out, does work, and technically worked without needing to 
         // Even have the padding in here as alignment takes care of that for us by aligning to 8 bytes, the
@@ -55,13 +54,12 @@ private:
 //        private:
 //        char        PADDING[2];     // Padding added to align DWORD
 //        public:
-        char        ftype[2];       // file type, should be 0x42 0x4D, or BM in ASCII
         uint32_t    size;           // size of BMP in bytes
         uint16_t    res1;           // Reserved; application dependent
         uint16_t    res2;           // Reserved; application dependent
         uint32_t    offset;         // Offset to the start of data
+        char        ftype[2];       // file type, should be 0x42 0x4D, or BM in ASCII
     }header;
-#pragma pack(pop) // not needed for other structures
 
     // Hex Dec Size Purpose
     // 0E  14  4B   size of the second header
