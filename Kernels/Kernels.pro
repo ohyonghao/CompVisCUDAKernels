@@ -66,7 +66,7 @@ CUDA_COMPUTE_ARCH = 75
 CUDA_DEFINES +=
 
 ## CUDA_DIR - the directory of cuda such that CUDA\<version-number\ contains the bin, lib, src and include folders
-CUDA_DIR= /usr/local/cuda-11.1
+CUDA_DIR= /usr/local/cuda-11.2
 
 ## CUDA_LIBS - the libraries to link
 CUDA_LIBS= -lcuda -lcudart

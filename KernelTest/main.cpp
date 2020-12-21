@@ -36,6 +36,10 @@ int main( int argc, char** argv)
         ofstream out;
 
         in.open(infile, ios::binary);
+        if( !in.is_open() ){
+            cout << "Could not open file." << endl;
+            return 0;
+        }
         in >> image;
         in.close();
 
