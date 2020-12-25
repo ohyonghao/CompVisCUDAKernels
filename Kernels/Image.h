@@ -14,16 +14,25 @@
 #include <vector>
 
 #include "../ImageUtils/bitmap.h"
+namespace Kernels {
+
 class Image {
 public:
     Image();
-    void CUDABlur( Bitmap& );
+    Image(const Bitmap & );
 	virtual ~Image();
 
+    void importImage(const Bitmap &);
+    void exportImage(Bitmap &);
+
+    auto bpp(){return p_bpp;}
+    auto size(){return p_size;}
+    auto width(){return p_width;}
+    auto height(){return p_height;}
+
+    auto data(){return thrust::raw_pointer_cast(&d_image[0]);}
+    auto result(){return thrust::raw_pointer_cast(&d_result[0]);}
 private:
-    void importImage( const Bitmap& );
-    void reloadImage( const Bitmap& );
-    void exportImage( Bitmap& );
 
     thrust::device_vector<float> d_image;
     thrust::device_vector<float> d_result;
@@ -32,18 +41,13 @@ private:
     size_t p_size{0};
     size_t p_width{0};
     size_t p_height{0};
-
-
-    const int maskwidth = 5;
-    template <typename T>
-    void GaussMask(std::vector<T>&);
-    void computeMask();
 };
 
+void CUDABlur( Bitmap& );
 // Fills matrix with binomial using an inplace calculation of
 // pascal's triangle and then backfilling the values.
 template <typename T>
-void Image::GaussMask(std::vector<T> &matrix){
+void GaussMask(std::vector<T> &matrix){
     const size_t size = static_cast<size_t>(sqrt(matrix.size()));
     const size_t half = (size >> 1 ) ;//+ (size &0b1 ? 1 : 0);
     // If matrix is empty or not square then return
@@ -92,4 +96,5 @@ void Image::GaussMask(std::vector<T> &matrix){
     matrix[size-1] = 1; // Fix the top right corner
 }
 
+}
 #endif /* IMAGE_H_ */

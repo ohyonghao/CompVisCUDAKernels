@@ -15,6 +15,25 @@
 
 #include "Image.h"
 using namespace std;
+namespace Kernels{
+
+struct convert: public thrust::unary_function<float, float>
+{
+__host__ __device__
+float operator()(float in){ return in/255.0;}
+};
+
+
+struct revert: public thrust::unary_function<float, float>
+{
+__host__ __device__
+float operator()(float in){ return in*255.0;}
+};
+
+__host__
+Image::Image(const Bitmap &bitmap){
+    importImage(bitmap);
+}
 
 __host__
 void Image::importImage(const Bitmap &bitmap){
@@ -26,29 +45,20 @@ void Image::importImage(const Bitmap &bitmap){
 
     cout << "bpp: " << p_bpp << endl;
     cout << "p_size: " << p_size << endl;
-    reloadImage(bitmap);
+
+    thrust::host_vector<float> h_image{begin(bitmap.getBits()), end(bitmap.getBits())};
+
+    cout << "host_vector.size(): " << h_image.size() << endl;
+    d_image = h_image;
+
+    cout << "d_image.size(): " << d_image.size() << endl;
+
+    thrust::transform(d_image.begin(), d_image.end(), d_image.begin(), convert() );
+
+    d_result.resize(d_image.size());
+
 }
 
-__host__
-void Image::reloadImage(const Bitmap &bitmap){
-    // Check if we can reuse memory that is allocated
-    if( p_width != bitmap.width() ||
-        p_height != bitmap.height() || p_size != d_image.size() ){
-        p_width = bitmap.width();
-        p_height = bitmap.height();
-        p_size = p_width * p_height * p_bpp;
-        d_image.resize(p_size);
-        d_result.resize(p_size);
-    }
-
-    // Now copy image over with resizing to [0,1)
-    thrust::host_vector<float> h_image(p_size);
-    std::transform(bitmap.getBits().cbegin(), bitmap.getBits().cend(), begin(h_image),[](auto in ){
-        return in/255.0;
-    });
-
-    thrust::copy(h_image.begin(), h_image.end(), d_image.begin() );
-}
 // Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
 inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
 
@@ -108,54 +118,38 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
         }
     }
 }
+
 __host__
-void Image::CUDABlur(Bitmap &bitmap){
+void CUDABlur(Bitmap &bitmap){
+
+    Image image{bitmap};
+    std::vector<int> mask(MASK_WIDTH*MASK_WIDTH);
+    GaussMask(mask);
+    // Copy the mask to constant memory
+    cudaMemcpyToSymbol(cd_Mask, mask.data(), MASK_WIDTH * sizeof(int));
+
     cout << "Calling CUDABlur" << endl;
     cout.flush();
-    if( p_size == 0 ){
-        importImage(bitmap);
-    }else{
-        reloadImage(bitmap);
-    }
 
     // launch kernel
-    dim3 grid{iDivUp( p_width * CHANNEL * 2, BLOCKW), iDivUp( p_height * 2, BLOCKH)};
+    dim3 grid{iDivUp( image.width() * CHANNEL * 2, BLOCKW), iDivUp( image.height() * 2, BLOCKH)};
     dim3 threadBlock{BLOCKW, BLOCKH};
-    kBlur<<<grid, threadBlock >>>(thrust::raw_pointer_cast(&d_image[0]),
-                                  thrust::raw_pointer_cast(&d_result[0]),
-                                  p_width * CHANNEL,
-                                  p_height,
-                                  maskwidth);
+    kBlur<<<grid, threadBlock >>>(image.data(),
+                                  image.result(),
+                                  image.width() * CHANNEL,
+                                  image.height(),
+                                  MASK_WIDTH);
 
     cudaDeviceSynchronize();
-    exportImage(bitmap);
+    image.exportImage(bitmap);
 }
 
 __host__
 void Image::exportImage(Bitmap &bitmap){
     cout << "Begin Exporting Image" << endl;
     thrust::host_vector<float> h_image(d_result.begin(), d_result.end());
-    cudaDeviceSynchronize();
 
-//    auto output = bitmap.getBits().begin();
-//    uint32_t count = 0;
-//    for( auto in = h_image.begin(); in != h_image.end(); ++in ){
-//        *output = (*in) * 255.0;
-//        ++count;
-//    }cout << "count: " << count << endl;
-
-    std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), [](auto in){
-        return in * 255.0;
-    });
+    std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
 }
 
-
-__host__
-void Image::computeMask(){
-    std::vector<int> mask(maskwidth*maskwidth);
-    GaussMask(mask);
-    // Copy the mask to constant memory
-    cudaMemcpyToSymbol(cd_Mask, mask.data(), MASK_WIDTH * sizeof(int));
 }
-
-

@@ -5,7 +5,7 @@
 #include "bitmap.h"
 #include "Image.h"
 using namespace std;
-
+using namespace Kernels;
 void printUsage(){
     cout << "Usage: ./KernelTest <image.bmp> <filter>" << endl;
 }
@@ -49,8 +49,7 @@ int main( int argc, char** argv)
         }
         else if(flag == "-G"){
             cout << "Running CUDA Kernel" << endl;
-            Image cuda_image;
-            cuda_image.CUDABlur(image);
+            CUDABlur(image);
             cout << "CUDA Kernel done" << endl;
         }else{
             cout << "Invalid Flag: " << flag << endl;

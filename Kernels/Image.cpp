@@ -7,8 +7,11 @@
 
 #include <Image.h>
 
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+
+using namespace Kernels;
 Image::Image() {
-    computeMask();
 }
 
 Image::~Image() {
