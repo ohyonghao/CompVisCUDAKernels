@@ -17,6 +17,25 @@
 using namespace std;
 namespace Kernels{
 
+//*****************************************************************************
+// Global access to our mask
+//*****************************************************************************
+
+constexpr int MASK_WIDTH = 5;
+constexpr int MASK_SCALE = 1 << ( (MASK_WIDTH - 1) );
+
+constexpr unsigned int BLOCKW = 32;
+constexpr unsigned int BLOCKH = 32;
+constexpr unsigned int CHANNEL = 3;
+constexpr unsigned int TILEW = 4 * CHANNEL; // pixels * channels RGBa
+constexpr unsigned int PIXEL_W = TILEW / CHANNEL;
+//constexpr unsigned int PIXEL_H = TILEW;
+
+
+//*****************************************************************************
+// Functors
+//*****************************************************************************
+
 struct convert: public thrust::unary_function<float, float>
 {
 __host__ __device__
@@ -44,6 +63,7 @@ void Image::importImage(const Bitmap &bitmap){
     p_size = p_width * p_height * p_bpp;
 
     cout << "bpp: " << p_bpp << endl;
+    // If 4 channels, then convert to RGB
     cout << "p_size: " << p_size << endl;
 
     thrust::host_vector<float> h_image{begin(bitmap.getBits()), end(bitmap.getBits())};
@@ -62,15 +82,6 @@ void Image::importImage(const Bitmap &bitmap){
 // Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
 inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
 
-// Global access to our mask
-constexpr int MASK_WIDTH = 5;
-
-constexpr unsigned int BLOCKW = 32;
-constexpr unsigned int BLOCKH = 32;
-constexpr unsigned int TILEW = 4 * 3; // pixels * channels RGB
-constexpr unsigned int CHANNEL = 3;
-constexpr unsigned int PIXEL_W = TILEW / CHANNEL;
-//constexpr unsigned int PIXEL_H = TILEW;
 __constant__ int cd_Mask[MASK_WIDTH][MASK_WIDTH];
 __global__
 void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth){
@@ -95,11 +106,12 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
         // TODO: Replace width with pitch
         s_tile[ty][tx] = d_image[row_i * width + col_i];
     } else{
+        // If ghost cell set to 0.0f
         s_tile[ty][tx]= 0.0f;
     }
     __syncthreads();
 
-    float output;
+    float output = 0.0f;
 
     // Here we are going to be careful to sum
     // only the same color channel, so move by CHANNEL
@@ -107,13 +119,12 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
     if( ty < TILEW && tx < TILEW ){
         for( int i = 0; i < MASK_WIDTH; ++i ){
             for( int j = 0; j < MASK_WIDTH; ++j ){
-                output += cd_Mask[i][j] * s_tile[i + ty][j * CHANNEL + tx ];
+                output += cd_Mask[i][j] * s_tile[i + ty][(j + tx) * CHANNEL ];
             }
         }
-
         // Do not use pitch on output
         if( row_o < height && col_o < width){
-            d_result[row_o * width + col_o] = output / (1 << ( (MASK_WIDTH - 1) * 2 ));
+            d_result[row_o * width + col_o] = output / MASK_SCALE;
             //d_result[row_o * width + col_o] = 1.0;
         }
     }
