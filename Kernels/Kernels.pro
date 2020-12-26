@@ -97,7 +97,7 @@ CONFIG(debug, debug|release) {
         CUDA_OBJECTS_DIR = cudaobj/$$SYSTEM_NAME/Debug
         cuda_d.input = CUDA_SOURCES
         cuda_d.output = $$CUDA_OBJECTS_DIR/${QMAKE_FILE_BASE}_cuda.o
-        cuda_d.commands = $$CUDA_DIR/bin/nvcc -g -G -lineinfo --std=c++17 -D_DEBUG $$CUDA_DEFINES $$NVCC_OPTIONS -I $$CUDA_INC -L$$CUDA_LIBS_DIR $$CUDA_LIBS --machine $$SYSTEM_TYPE $$CUDA_ARCH -c -o ${QMAKE_FILE_OUT} ${QMAKE_FILE_NAME}
+        cuda_d.commands = $$CUDA_DIR/bin/nvcc -g -G --std=c++17 -D_DEBUG $$CUDA_DEFINES $$NVCC_OPTIONS -I $$CUDA_INC -L$$CUDA_LIBS_DIR $$CUDA_LIBS --machine $$SYSTEM_TYPE $$CUDA_ARCH -c -o ${QMAKE_FILE_OUT} ${QMAKE_FILE_NAME}
         cuda_d.dependency_type = TYPE_C
         QMAKE_EXTRA_COMPILERS += cuda_d
 }
