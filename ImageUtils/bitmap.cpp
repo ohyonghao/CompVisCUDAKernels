@@ -43,6 +43,7 @@ istream& operator>>(istream& in, Bitmap& bitmap) {
         b.b_mask = 0;
     }
 
+
     // We have enough information to set aside the memory needed to load the rest
     // of the image
 
@@ -52,6 +53,7 @@ istream& operator>>(istream& in, Bitmap& bitmap) {
 
     b._bits.resize(b.dibs.rawSize);
 
+    in.seekg(b.header.offset);
     in.read(reinterpret_cast<char*>(b._bits.data()), b.dibs.rawSize);
     // If nothings gone wrong, swap it out
     swap(bitmap, move(b));
@@ -68,8 +70,15 @@ ostream& operator<<(ostream& out, const Bitmap& b) {
     out.write(reinterpret_cast<const char*>(&b.header), sizeof(b.header));
     out.write( reinterpret_cast<const char*>(&b.dibs), sizeof(b.dibs));
     // Colorspace if 32bit which is implied by cmpsn != 0
-    if( b.dibs.cmpsn )
+    if( b.dibs.cmpsn ){
         out.write( reinterpret_cast<const char*>(&b.colorspace), sizeof(b.colorspace));
+    }
+    size_t size = out.tellp();
+    while( size < b.header.offset ){
+        const char naught = 0;
+        out.write( &naught, sizeof(char));
+        size = out.tellp();
+    }
 
     // Then body
     out.write( reinterpret_cast<const char*>(b._bits.data()), b._bits.size());

@@ -36,7 +36,7 @@ private:
     // Hex Dec Size Purpose
     // 00  0   2B   Id type of bitmap
     // 02  2   4B   Size of BMP
-    // 06  5   4B   Garbage
+    // 06  6   4B   Garbage
     // 0A  10  4B   Offset to the start of data
     // Warning: Read in little endian if using Vim:%!xxd
 #pragma pack(push, 2) // fixes problem with char array becoming 4 bytes for alignment purposes
