@@ -22,15 +22,13 @@ namespace Kernels{
 //*****************************************************************************
 
 constexpr int MASK_WIDTH = 5;
-constexpr int MASK_SCALE = 1 << ( (MASK_WIDTH - 1) );
+constexpr int MASK_SCALE = 1 << ( ( (MASK_WIDTH - 1)  * 2 ) );
 
 constexpr unsigned int BLOCKW = 32;
 constexpr unsigned int BLOCKH = 32;
 constexpr unsigned int CHANNEL = 3;
 constexpr unsigned int TILEW = ((BLOCKW - (MASK_WIDTH - 1 ) * CHANNEL)/CHANNEL) ; // Number of pixels // should be 6
 constexpr unsigned int TILEH = BLOCKH - MASK_WIDTH + 1;
-//constexpr unsigned int PIXEL_W = TILEW / CHANNEL;
-//constexpr unsigned int PIXEL_H = TILEW;
 
 
 //*****************************************************************************
@@ -46,8 +44,7 @@ float operator()(float in){ return in/255.0;}
 
 struct revert: public thrust::unary_function<float, float>
 {
-__host__ __device__
-float operator()(float in){ return in*255.0;}
+float operator()(float in){ return in*255.0f;}
 };
 
 __host__
@@ -77,6 +74,7 @@ void Image::importImage(const Bitmap &bitmap){
     thrust::transform(d_image.begin(), d_image.end(), d_image.begin(), convert() );
 
     d_result.resize(d_image.size());
+    thrust::fill(d_result.begin(), d_result.end(), 0.5f);
 
 }
 
@@ -92,16 +90,16 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
     const int tx = threadIdx.x;
     const int ty = threadIdx.y;
 
-    //if( blockIdx.x > 0 || blockIdx.y > 0 ) return;
+
     // Threads output coordinates
     const int row_o = blockIdx.y * TILEH + ty;
-    const int col_o = blockIdx.x * TILEW + tx;
+    const int col_o = blockIdx.x * TILEW * CHANNEL + tx;
 
     // Threads input coordinate
     const int row_i = row_o - (MASK_WIDTH/2);
     const int col_i = col_o - CHANNEL * (MASK_WIDTH/2);
+
     // grab all our pixels we need
-    // Working on 4 pixels at a time
     __shared__ float s_tile[BLOCKW][BLOCKH];
 
     if(( row_i >= 0 ) && ( row_i < height ) &&
@@ -112,23 +110,24 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
         // If ghost cell set to 0.0f
         s_tile[ty][tx]= 0.0f;
     }
+
     __syncthreads();
 
     float output = 0.0f;
 
+    // Only take coordinates used in the tile, not the whole block
     // Here we are going to be careful to sum
     // only the same color channel, so move by CHANNEL
     // across the X
-    if( ty < TILEH && tx < TILEW ){
+    if( ty < TILEH && tx < TILEW * CHANNEL ){
         for( int i = 0; i < MASK_WIDTH; ++i ){
             for( int j = 0; j < MASK_WIDTH; ++j ){
-                output += cd_Mask[i][j] * s_tile[i + ty][(j + tx) * CHANNEL ];
+                output += cd_Mask[i][j] * s_tile[ty + i][tx + j * CHANNEL];
             }
         }
         // Do not use pitch on output
         if( row_o < height && col_o < width){
-            d_result[row_o * width + col_o] = output / MASK_SCALE;
-            //d_result[row_o * width + col_o] = 1.0;
+            d_result[row_o * width + col_o] = output / MASK_SCALE > 1.0f ? 1.0f : output / MASK_SCALE;
         }
     }
 }
@@ -139,13 +138,13 @@ void CUDABlur(Bitmap &bitmap){
     std::vector<int> mask(MASK_WIDTH*MASK_WIDTH);
     GaussMask(mask);
     // Copy the mask to constant memory
-    cudaMemcpyToSymbol(cd_Mask, mask.data(), MASK_WIDTH * sizeof(int));
+    cudaMemcpyToSymbol(cd_Mask, mask.data(), MASK_WIDTH*MASK_WIDTH * sizeof(int));
 
     cout << "Calling CUDABlur" << endl;
     cout.flush();
 
     // launch kernel
-    dim3 grid{iDivUp( image.width() * CHANNEL, TILEW), iDivUp( image.height() , TILEH)};
+    dim3 grid{iDivUp( image.width(), TILEW) * CHANNEL, iDivUp( image.height() , TILEH)};
     dim3 threadBlock{BLOCKW, BLOCKH};
 
 
