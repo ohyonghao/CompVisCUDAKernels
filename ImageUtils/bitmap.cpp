@@ -268,9 +268,11 @@ void blur(Bitmap& b ) {
             for( uint32_t k = 0; k < matrix.size(); ++k ){
                 // We'll do it a slow way at first, then think about optimization
                 // The biggest roadblock to a good algorithm is optimizing too early
-                result[0][k] = b.r( clamp(i+xindex, 0, b.width()-1 ), clamp(j+yindex, 0, b.height()-1) );
-                result[1][k] = b.g( clamp(i+xindex, 0, b.width()-1 ), clamp(j+yindex, 0, b.height()-1) );
-                result[2][k] = b.b( clamp(i+xindex, 0, b.width()-1 ), clamp(j+yindex, 0, b.height()-1) );
+                result[0][k] = i + xindex < 0 || i + xindex > b.width() - 1 || j + yindex < 0 || j + yindex > b.height() - 1 ? 0 : b.r( i+xindex, j+yindex );
+                result[1][k] = i + xindex < 0 || i + xindex > b.width() - 1 || j + yindex < 0 || j + yindex > b.height() - 1 ? 0 : b.r( i+xindex, j+yindex );
+                result[2][k] = i + xindex < 0 || i + xindex > b.width() - 1 || j + yindex < 0 || j + yindex > b.height() - 1 ? 0 : b.r( i+xindex, j+yindex );
+                //result[1][k] = b.g( clamp(i+xindex, 0, b.width()-1 ), clamp(j+yindex, 0, b.height()-1) );
+                //result[2][k] = b.b( clamp(i+xindex, 0, b.width()-1 ), clamp(j+yindex, 0, b.height()-1) );
                 // Update indexes
                 if( yindex == 2 ){
                     --xindex;
