@@ -29,7 +29,7 @@ constexpr unsigned int BLOCKH = 32;
 constexpr unsigned int CHANNEL = 3;
 constexpr unsigned int TILEW = ((BLOCKW - (MASK_WIDTH - 1 ) * CHANNEL)/CHANNEL) ; // Number of pixels // should be 6
 constexpr unsigned int TILEH = BLOCKH - MASK_WIDTH + 1;
-
+constexpr unsigned int WORDSIZE = 32;
 
 //*****************************************************************************
 // Functors
@@ -38,7 +38,7 @@ constexpr unsigned int TILEH = BLOCKH - MASK_WIDTH + 1;
 struct convert: public thrust::unary_function<float, float>
 {
 __host__ __device__
-float operator()(float in){ return in/255.0;}
+float operator()(float in){ return in/255.0f;}
 };
 
 
@@ -58,24 +58,47 @@ void Image::importImage(const Bitmap &bitmap){
     p_bpp = bitmap.bpp();
     p_width = bitmap.width();
     p_height = bitmap.height();
-    p_size = p_width * p_height * p_bpp;
+
+    // Calculate the pitch
+    p_pitch = p_width % WORD_SIZE;
+    p_size = p_pitch * p_height * p_bpp;
 
     cout << "bpp: " << p_bpp << endl;
-    // If 4 channels, then convert to RGB
+    // TODO: If 4 channels, then convert to RGB
+    cout << "p_pitch: " << p_pitch << endl;
     cout << "p_size: " << p_size << endl;
 
-    thrust::host_vector<float> h_image{begin(bitmap.getBits()), end(bitmap.getBits())};
+    d_image.resize(p_size);
 
-    cout << "host_vector.size(): " << h_image.size() << endl;
-    d_image = h_image;
+    auto bits_in  = begin(bitmap.getBits());
+    auto bits_out = begin(d_image);
+
+    for( size_t i = 0; i < p_height; ++i ){
+        thrust::copy_n(bits_in, p_width, bits_out);
+        bits_in  += p_pitch;
+        bits_out += p_pitch;
+    }
 
     cout << "d_image.size(): " << d_image.size() << endl;
 
-    thrust::transform(d_image.begin(), d_image.end(), d_image.begin(), convert() );
+    thrust::transform(thrust::device_vector, d_image.begin(), d_image.end(), d_image.begin(), convert() );
 
     d_result.resize(d_image.size());
-    thrust::fill(d_result.begin(), d_result.end(), 0.5f);
+}
 
+__host__
+void Image::exportImage(Bitmap &bitmap){
+    cout << "Begin Exporting Image" << endl;
+    thrust::host_vector<float> h_image(d_result.begin(), d_result.end());
+
+    auto bits_in = begin(h_image);
+    auto bits_out = begin(bitmap.getBits());
+
+    for( size_t i = 0; i < p_height; ++i ){
+        std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
+        bits_in  += p_pitch;
+        bits_out += p_pitch;
+    }
 }
 
 // Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
@@ -84,7 +107,7 @@ inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { ret
 __constant__ int cd_Mask[MASK_WIDTH][MASK_WIDTH];
 // Width includes channels in it
 __global__
-void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth){
+void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth, int pitch){
 
     // Threads id
     const int tx = threadIdx.x;
@@ -105,7 +128,7 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
     if(( row_i >= 0 ) && ( row_i < height ) &&
        ( col_i >= 0 ) && ( col_i < width ) ){
         // TODO: Replace width with pitch
-        s_tile[ty][tx] = d_image[row_i * width + col_i];
+        s_tile[ty][tx] = d_image[row_i * pitch + col_i];
     } else{
         // If ghost cell set to 0.0f
         s_tile[ty][tx]= 0.0f;
@@ -127,7 +150,7 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
         }
         // Do not use pitch on output
         if( row_o < height && col_o < width){
-            d_result[row_o * width + col_o] = output / MASK_SCALE > 1.0f ? 1.0f : output / MASK_SCALE;
+            d_result[row_o * pitch + col_o] = output / MASK_SCALE > 1.0f ? 1.0f : output / MASK_SCALE;
         }
     }
 }
@@ -154,18 +177,12 @@ void CUDABlur(Bitmap &bitmap){
                                   image.result(),
                                   image.width() * CHANNEL,
                                   image.height(),
-                                  MASK_WIDTH);
+                                  MASK_WIDTH,
+                                  image.pitch());
 
     cudaDeviceSynchronize();
     image.exportImage(bitmap);
 }
 
-__host__
-void Image::exportImage(Bitmap &bitmap){
-    cout << "Begin Exporting Image" << endl;
-    thrust::host_vector<float> h_image(d_result.begin(), d_result.end());
-
-    std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
-}
 
 }

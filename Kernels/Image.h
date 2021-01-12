@@ -16,6 +16,14 @@
 #include "../ImageUtils/bitmap.h"
 namespace Kernels {
 
+// Properties to be
+struct ImageProperties{
+    int width;
+    int height;
+    int pitch;
+    int channels;
+};
+
 class Image {
 public:
     Image();
@@ -25,22 +33,20 @@ public:
     void importImage(const Bitmap &);
     void exportImage(Bitmap &);
 
-    auto bpp(){return p_bpp;}
-    auto size(){return p_size;}
-    auto width(){return p_width;}
-    auto height(){return p_height;}
-
-    auto data(){return thrust::raw_pointer_cast(&d_image[0]);}
-    auto result(){return thrust::raw_pointer_cast(&d_result[0]);}
+    auto size()    {return p_size;}
+    auto width()   {return prop.width;}
+    auto height()  {return prop.height;}
+    auto pitch()   {return prop.pitch;}
+    auto channels(){return prop.channels;}
+    auto data()    {return thrust::raw_pointer_cast(&d_image[0]);}
+    auto result()  {return thrust::raw_pointer_cast(&d_result[0]);}
 private:
 
     thrust::device_vector<float> d_image;
     thrust::device_vector<float> d_result;
 
-    size_t p_bpp{0};
+    ImageProperties prop{0,0,0,0};
     size_t p_size{0};
-    size_t p_width{0};
-    size_t p_height{0};
 };
 
 void CUDABlur( Bitmap& );
