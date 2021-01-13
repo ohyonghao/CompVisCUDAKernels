@@ -51,7 +51,7 @@ int main( int argc, char** argv)
         else if(flag == "-G"){
             cout << "Running CUDA Kernel" << endl;
             auto start = chrono::high_resolution_clock::now();
-            CUDABlur(image, 100);
+            CUDABlur(image, 1000);
             auto end = chrono::high_resolution_clock::now();
             cout << "CUDA Kernel done in " << chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "s" << endl;
         }else{

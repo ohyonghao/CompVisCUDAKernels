@@ -196,7 +196,9 @@ void CUDABlur(Bitmap &bitmap, size_t iterations){
                                       image.pitch());
 
         cudaDeviceSynchronize();
+        image.swap_work();
     }
+    image.swap_work();
     image.exportImage(bitmap);
 }
 

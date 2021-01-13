@@ -40,6 +40,7 @@ public:
     auto channels(){return prop.channels;}
     auto data()    {return thrust::raw_pointer_cast(&d_image[0]);}
     auto result()  {return thrust::raw_pointer_cast(&d_result[0]);}
+    void swap_work() {swap(d_image, d_result);}
 private:
 
     thrust::device_vector<float> d_image;
