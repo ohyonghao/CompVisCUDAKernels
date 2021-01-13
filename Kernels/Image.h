@@ -49,7 +49,7 @@ private:
     size_t p_size{0};
 };
 
-void CUDABlur( Bitmap& );
+void CUDABlur( Bitmap&, size_t iterations = 1 );
 // Fills matrix with binomial using an inplace calculation of
 // pascal's triangle and then backfilling the values.
 template <typename T>

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <chrono>
 
 #include "bitmap.h"
 #include "Image.h"
@@ -49,8 +50,10 @@ int main( int argc, char** argv)
         }
         else if(flag == "-G"){
             cout << "Running CUDA Kernel" << endl;
-            CUDABlur(image);
-            cout << "CUDA Kernel done" << endl;
+            auto start = chrono::high_resolution_clock::now();
+            CUDABlur(image, 100);
+            auto end = chrono::high_resolution_clock::now();
+            cout << "CUDA Kernel done in " << chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "s" << endl;
         }else{
             cout << "Invalid Flag: " << flag << endl;
             printUsage();

@@ -9,6 +9,7 @@
 #include <cuda_runtime_api.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
+#include <thrust/execution_policy.h>
 
 #include <iostream>
 #include <algorithm>
@@ -29,7 +30,7 @@ constexpr unsigned int BLOCKH = 32;
 constexpr unsigned int CHANNEL = 3;
 constexpr unsigned int TILEW = ((BLOCKW - (MASK_WIDTH - 1 ) * CHANNEL)/CHANNEL) ; // Number of pixels // should be 6
 constexpr unsigned int TILEH = BLOCKH - MASK_WIDTH + 1;
-constexpr unsigned int WORDSIZE = 32;
+constexpr unsigned int WORD_SIZE = 32;
 
 //*****************************************************************************
 // Functors
@@ -41,11 +42,14 @@ __host__ __device__
 float operator()(float in){ return in/255.0f;}
 };
 
-
 struct revert: public thrust::unary_function<float, float>
 {
+__host__ __device__
 float operator()(float in){ return in*255.0f;}
 };
+
+// Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
+inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
 
 __host__
 Image::Image(const Bitmap &bitmap){
@@ -55,17 +59,17 @@ Image::Image(const Bitmap &bitmap){
 __host__
 void Image::importImage(const Bitmap &bitmap){
     // TODO: Calculate importing padding known as pitch=(width + padding)
-    p_bpp = bitmap.bpp();
-    p_width = bitmap.width();
-    p_height = bitmap.height();
+    prop.channels = bitmap.bpp();
+    prop.width = bitmap.width();
+    prop.height = bitmap.height();
 
     // Calculate the pitch
-    p_pitch = p_width % WORD_SIZE;
-    p_size = p_pitch * p_height * p_bpp;
+    prop.pitch = iDivUp(prop.width * prop.channels, WORD_SIZE) * WORD_SIZE;
+    p_size = prop.pitch * prop.height;
 
-    cout << "bpp: " << p_bpp << endl;
+    cout << "channels: " << prop.channels << endl;
     // TODO: If 4 channels, then convert to RGB
-    cout << "p_pitch: " << p_pitch << endl;
+    cout << "prop.pitch: " << prop.pitch << endl;
     cout << "p_size: " << p_size << endl;
 
     d_image.resize(p_size);
@@ -73,15 +77,23 @@ void Image::importImage(const Bitmap &bitmap){
     auto bits_in  = begin(bitmap.getBits());
     auto bits_out = begin(d_image);
 
-    for( size_t i = 0; i < p_height; ++i ){
-        thrust::copy_n(bits_in, p_width, bits_out);
-        bits_in  += p_pitch;
-        bits_out += p_pitch;
+    size_t i = 0;
+    try{
+    for( ; i < prop.height; ++i ){
+        thrust::copy_n(bits_in, prop.width * prop.channels, bits_out);
+        bits_in  += prop.width * prop.channels;
+        bits_out += prop.pitch;
+    }
+    }catch(...){
+        cout << "Error caught transferring host->device on " << i << "th iteration" << endl;
+        auto cudaerr = cudaGetLastError();
+        cout << "CudaError: " << cudaerr << endl;
+        throw;
     }
 
     cout << "d_image.size(): " << d_image.size() << endl;
 
-    thrust::transform(thrust::device_vector, d_image.begin(), d_image.end(), d_image.begin(), convert() );
+    thrust::transform(thrust::device, d_image.begin(), d_image.end(), d_image.begin(), convert() );
 
     d_result.resize(d_image.size());
 }
@@ -94,15 +106,17 @@ void Image::exportImage(Bitmap &bitmap){
     auto bits_in = begin(h_image);
     auto bits_out = begin(bitmap.getBits());
 
-    for( size_t i = 0; i < p_height; ++i ){
-        std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
-        bits_in  += p_pitch;
-        bits_out += p_pitch;
+//    for( size_t i = 0; i < prop.height; ++i ){
+//        std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
+//        bits_in  += prop.pitch;
+//        bits_out += prop.width * prop.channels;
+//    }
+    for( auto i = 0; i < prop.height; ++i){
+        std::transform( bits_in, bits_in + prop.width * prop.channels, bits_out, revert() );
+        bits_in  += prop.pitch;
+        bits_out += prop.width * prop.channels;
     }
 }
-
-// Source: https://qiita.com/naoyuki_ichimura/items/8c80e67a10d99c2fb53c
-inline unsigned int iDivUp( const unsigned int &a, const unsigned int &b ) { return ( a%b != 0 ) ? (a/b+1):(a/b); }
 
 __constant__ int cd_Mask[MASK_WIDTH][MASK_WIDTH];
 // Width includes channels in it
@@ -156,7 +170,7 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
 }
 
 __host__
-void CUDABlur(Bitmap &bitmap){
+void CUDABlur(Bitmap &bitmap, size_t iterations){
     Image image{bitmap};
     std::vector<int> mask(MASK_WIDTH*MASK_WIDTH);
     GaussMask(mask);
@@ -173,14 +187,16 @@ void CUDABlur(Bitmap &bitmap){
 
     cout << "GRID_DIM: <" << grid.x << ", " << grid.y << ", " << grid.z << ">" << endl;
     cout << "BLOCK_DIM: <" << threadBlock.x << ", " << threadBlock.y << ", " << threadBlock.z << ">" << endl;
-    kBlur<<<grid, threadBlock >>>(image.data(),
-                                  image.result(),
-                                  image.width() * CHANNEL,
-                                  image.height(),
-                                  MASK_WIDTH,
-                                  image.pitch());
+    for( auto i = 0; i < iterations; ++i ){
+        kBlur<<<grid, threadBlock >>>(image.data(),
+                                      image.result(),
+                                      image.width() * CHANNEL,
+                                      image.height(),
+                                      MASK_WIDTH,
+                                      image.pitch());
 
-    cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
+    }
     image.exportImage(bitmap);
 }
 
