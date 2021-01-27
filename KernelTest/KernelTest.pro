@@ -15,19 +15,27 @@ qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
-LIBS += -L$$OUT_PWD/../lib/debug -lImageUtils \
-        -lKernels
-
 INCLUDEPATH += \
         $$PWD/../ImageUtils \
         $$PWD/../Kernels
 DEPENDPATH += \
         $$PWD/../ImageUtils \
         $$PWD/../Kernels
+CONFIG(debug, debug|release) {
+
+LIBS += -L$$OUT_PWD/../lib/debug -lImageUtils \
+        -lKernels
 
 PRE_TARGETDEPS += $$OUT_PWD/../lib/debug/libImageUtils.a \
                   $$OUT_PWD/../lib/debug/libKernels.a
+}else{
 
+LIBS += -L$$OUT_PWD/../lib/release -lImageUtils \
+        -lKernels
+
+PRE_TARGETDEPS += $$OUT_PWD/../lib/release/libImageUtils.a \
+                  $$OUT_PWD/../lib/release/libKernels.a
+}
 #-----------------------------------------------------
 # CUDA CONFIGURATION
 #-----------------------------------------------------
