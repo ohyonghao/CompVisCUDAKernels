@@ -55,7 +55,7 @@ SYSTEM_TYPE = 64
 ## CUDA_COMPUTE_ARCH - This will enable nvcc to compiler appropriate architecture specific code for different compute versions.
 ## Multiple architectures can be requested by using a space to seperate. example:
 
-CUDA_COMPUTE_ARCH = 75
+CUDA_COMPUTE_ARCH = 75 80 86
 
 ## CUDA_DEFINES - The seperate defines needed for the cuda device and host methods
 CUDA_DEFINES +=
