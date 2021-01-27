@@ -34,6 +34,8 @@ constexpr unsigned int WORD_SIZE = 32;
 
 //*****************************************************************************
 // Functors
+// Therese are used in stl style algorithms. Currently CUDA does not support
+// lambda captures so we must make these functors instead.
 //*****************************************************************************
 
 struct convert: public thrust::unary_function<float, float>
@@ -58,32 +60,37 @@ Image::Image(const Bitmap &bitmap){
 
 __host__
 void Image::importImage(const Bitmap &bitmap){
-    // TODO: Calculate importing padding known as pitch=(width + padding)
+    // Copy out the important properties needed
     prop.channels = bitmap.bpp();
     prop.width = bitmap.width();
     prop.height = bitmap.height();
 
+    const auto bitwidth = prop.width * prop.channels;
     // Calculate the pitch
-    prop.pitch = iDivUp(prop.width * prop.channels, WORD_SIZE) * WORD_SIZE;
+    prop.pitch = iDivUp(bitwidth, WORD_SIZE) * WORD_SIZE;
     p_size = prop.pitch * prop.height;
 
+    // TODO: If 4 channels, then convert to RGB, this would make prop.channels = 3
     cout << "channels: " << prop.channels << endl;
-    // TODO: If 4 channels, then convert to RGB
     cout << "prop.pitch: " << prop.pitch << endl;
     cout << "p_size: " << p_size << endl;
 
+    // Allocate enough space on device
     d_image.resize(p_size);
 
+    // Grab input and output iterators
     auto bits_in  = begin(bitmap.getBits());
     auto bits_out = begin(d_image);
 
-    size_t i = 0;
+    // Note the input image is not padded and we move with the bitwdith
+    // The device image we are padding by moving its iterator with the pitch
+    auto i = 0;
     try{
-    for( ; i < prop.height; ++i ){
-        thrust::copy_n(bits_in, prop.width * prop.channels, bits_out);
-        bits_in  += prop.width * prop.channels;
-        bits_out += prop.pitch;
-    }
+        for( ; i < prop.height; ++i ){
+            thrust::copy_n(bits_in, bitwidth, bits_out);
+            bits_in  += bitwidth;
+            bits_out += prop.pitch;
+        }
     }catch(...){
         cout << "Error caught transferring host->device on " << i << "th iteration" << endl;
         auto cudaerr = cudaGetLastError();
@@ -92,25 +99,20 @@ void Image::importImage(const Bitmap &bitmap){
     }
 
     cout << "d_image.size(): " << d_image.size() << endl;
-
-    thrust::transform(thrust::device, d_image.begin(), d_image.end(), d_image.begin(), convert() );
-
     d_result.resize(d_image.size());
+
+    // Scale the image on the device
+    thrust::transform(thrust::device, d_image.begin(), d_image.end(), d_image.begin(), convert() );
 }
 
 __host__
 void Image::exportImage(Bitmap &bitmap){
     cout << "Begin Exporting Image" << endl;
-    thrust::host_vector<float> h_image(d_result.begin(), d_result.end());
+    thrust::host_vector<float> h_image(d_image.begin(), d_image.end());
 
     auto bits_in = begin(h_image);
     auto bits_out = begin(bitmap.getBits());
 
-//    for( size_t i = 0; i < prop.height; ++i ){
-//        std::transform(h_image.begin(), h_image.end(), begin(bitmap.getBits()), revert());
-//        bits_in  += prop.pitch;
-//        bits_out += prop.width * prop.channels;
-//    }
     for( auto i = 0; i < prop.height; ++i){
         std::transform( bits_in, bits_in + prop.width * prop.channels, bits_out, revert() );
         bits_in  += prop.pitch;
@@ -170,8 +172,7 @@ void kBlur(float *d_image, float *d_result, int width, int height, int maskWidth
 }
 
 __host__
-void CUDABlur(Bitmap &bitmap, size_t iterations){
-    Image image{bitmap};
+void CUDABlur(Image &image, size_t iterations){
     std::vector<int> mask(MASK_WIDTH*MASK_WIDTH);
     GaussMask(mask);
     // Copy the mask to constant memory
@@ -198,8 +199,6 @@ void CUDABlur(Bitmap &bitmap, size_t iterations){
         cudaDeviceSynchronize();
         image.swap_work();
     }
-    image.swap_work();
-    image.exportImage(bitmap);
 }
 
 

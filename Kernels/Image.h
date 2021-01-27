@@ -16,7 +16,10 @@
 #include "../ImageUtils/bitmap.h"
 namespace Kernels {
 
-// Properties to be
+// Properties to be used for image, this was done this way mostly
+// due  to the example in the book. Something to check would be
+// sending the struct through the kernel call. So far I have only
+// sent C++ basic types
 struct ImageProperties{
     int width;
     int height;
@@ -24,6 +27,12 @@ struct ImageProperties{
     int channels;
 };
 
+// Holds an image buffered in device memory that has been padded with a
+// second copy of the result.
+// Exmaple:
+//      Image image( bitmap );
+//      CUDABlur( image );
+//      image.exportImage( bitmap );
 class Image {
 public:
     Image();
@@ -33,13 +42,21 @@ public:
     void importImage(const Bitmap &);
     void exportImage(Bitmap &);
 
-    auto size()    {return p_size;}
-    auto width()   {return prop.width;}
-    auto height()  {return prop.height;}
-    auto pitch()   {return prop.pitch;}
-    auto channels(){return prop.channels;}
-    auto data()    {return thrust::raw_pointer_cast(&d_image[0]);}
-    auto result()  {return thrust::raw_pointer_cast(&d_result[0]);}
+    auto size()      {return p_size;}
+    auto width()     {return prop.width;}
+    auto height()    {return prop.height;}
+    auto pitch()     {return prop.pitch;}
+    auto channels()  {return prop.channels;}
+
+    // Returns a raw CUDA pointer to be used in kernels
+    // The image is stored scaled to [0,1]. It is up to the
+    // caller to move the result to data with swap_work() after
+    // a kernel has finished executing.
+    auto data()      {return thrust::raw_pointer_cast(&d_image[0]);}
+    auto result()    {return thrust::raw_pointer_cast(&d_result[0]);}
+
+    // Swaps our pointers to data and result so we can do work on this without
+    // needing to export and import the image incurring the memory transfer costs.
     void swap_work() {swap(d_image, d_result);}
 private:
 
@@ -50,9 +67,14 @@ private:
     size_t p_size{0};
 };
 
-void CUDABlur( Bitmap&, size_t iterations = 1 );
+// Performs a gaussian blur operation on the provided Bitmap for the number
+// of given iterations. The given iterations guarntees that it will not be
+// transferred back to host memory until after the complete openation is done.
+void CUDABlur( Image&, size_t iterations = 1 );
+
 // Fills matrix with binomial using an inplace calculation of
 // pascal's triangle and then backfilling the values.
+// When used with integer types this avoids using the FPU
 template <typename T>
 void GaussMask(std::vector<T> &matrix){
     const size_t size = static_cast<size_t>(sqrt(matrix.size()));

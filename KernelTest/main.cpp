@@ -33,7 +33,7 @@ int main( int argc, char** argv)
         string flag = argv[2];
 
         ifstream in;
-        Bitmap image;
+        Bitmap bitmap;
         ofstream out;
 
         in.open(infile, ios::binary);
@@ -41,17 +41,20 @@ int main( int argc, char** argv)
             cout << "Could not open file." << endl;
             return 0;
         }
-        in >> image;
+        in >> bitmap;
         in.close();
 
         if(flag == "-g"){
             cout << "Running CPU Kernel" << endl;
-            pixelate(image);
+            pixelate(bitmap);
         }
         else if(flag == "-G"){
             cout << "Running CUDA Kernel" << endl;
+            // Capture timing outside the call, this will include the memory transfer
             auto start = chrono::high_resolution_clock::now();
+            Image image(bitmap);
             CUDABlur(image, 1000);
+            image.exportImage(bitmap);
             auto end = chrono::high_resolution_clock::now();
             cout << "CUDA Kernel done in " << chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "s" << endl;
         }else{
@@ -62,7 +65,7 @@ int main( int argc, char** argv)
 
         cout << "Writing result to " << outfile << endl;
         out.open(outfile, ios::binary);
-        out << image;
+        out << bitmap;
         out.close();
     }
     catch(...)
